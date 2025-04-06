@@ -1,1 +1,518 @@
-<h1>vibebounce</h1>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeBounce SVO Sim</title>
+    <style>
+        :root {
+            --control-panel-width: 500px;
+            --base-padding: 15px;
+            --transition-speed: 0.3s;
+        }
+
+        body { margin: 0; overflow: hidden; background-color: #111; color: white; font-family: monospace; display: flex; position: relative; }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+            transition: width var(--transition-speed) ease;
+        }
+
+        canvas { display: block; position: absolute; top: 0; left: 0; cursor: crosshair; }
+
+        .toggle-button {
+            position: fixed;
+            background-color: rgba(50, 50, 55, 0.8);
+            color: #eee;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 102;
+            font-size: 0.9em;
+            transition: background-color 0.2s ease;
+            -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(3px);
+        }
+        .toggle-button:hover { background-color: rgba(70, 70, 75, 0.9); }
+        .toggle-button:active { background-color: rgba(90, 90, 95, 0.95); }
+
+
+        #toggle-description { top: var(--base-padding); left: var(--base-padding); }
+        #toggle-debug { bottom: var(--base-padding); left: var(--base-padding); }
+        #toggle-controls { top: var(--base-padding); right: var(--base-padding); }
+
+
+        #description-area {
+            position: absolute;
+            top: calc(var(--base-padding) * 2 + 40px);
+            left: var(--base-padding);
+            right: calc(var(--control-panel-width) + var(--base-padding));
+            background: rgba(20, 20, 25, 0.85);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100;
+            pointer-events: none;
+            font-size: 1.1em;
+            max-height: calc(100vh - 270px);
+            overflow-y: auto;
+            transition: opacity var(--transition-speed) ease, visibility var(--transition-speed) ease, right var(--transition-speed) ease;
+            opacity: 1;
+            visibility: visible;
+        }
+         #description-area h2, #description-area h4 { margin-top: 0; margin-bottom: 10px; color: #00aaff; text-align: center; }
+         #description-area p { margin-bottom: 10px; line-height: 1.4; color: #ddd; }
+         #description-area ul { list-style: none; padding: 0 0 0 15px; margin-bottom: 15px; }
+          #description-area li { margin-bottom: 5px; }
+         #description-area code { background-color: rgba(0,0,0,0.3); padding: 1px 4px; border-radius: 3px; font-size: 0.95em; }
+         #description-area .credits { font-size: 0.9em; text-align: center; margin-top: 15px; color: #aaa; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; }
+
+
+        #debug {
+            position: absolute;
+            bottom: calc(var(--base-padding) * 2 + 40px);
+            left: var(--base-padding);
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            font-size: 14px;
+            max-height: 180px;
+            width: 450px;
+            overflow-y: scroll;
+            border-radius: 3px;
+            line-height: 1.4;
+            z-index: 99;
+            transition: opacity var(--transition-speed) ease, visibility var(--transition-speed) ease;
+            opacity: 1;
+            visibility: visible;
+         }
+
+
+        #control-panel {
+            flex-shrink: 0;
+            position: relative;
+            width: var(--control-panel-width); height: 100vh;
+            background-color: rgba(40, 40, 45, 0.9);
+            padding: 25px; box-sizing: border-box;
+            overflow-y: auto; z-index: 101;
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 1.6em;
+            transition: margin-right var(--transition-speed) ease;
+            margin-right: 0;
+        }
+        #control-panel h3 { margin-top: 0; margin-bottom: 25px; padding-bottom: 8px; color: #eee; border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: center; font-size: 1.2em; }
+        #control-panel div { margin-bottom: 20px; }
+        #control-panel label { display: block; font-size: 0.9em; margin-bottom: 6px; color: #ccc; }
+        #control-panel label span { float: right; color: #fff; font-weight: bold; min-width: 60px; text-align: right; background-color: rgba(0,0,0,0.2); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+        #control-panel select, #control-panel input[type="range"], #control-panel input[type="number"] { width: 100%; box-sizing: border-box; margin-top: 4px; padding: 5px; font-size: 0.9em; }
+        #control-panel input[type="range"] { cursor: pointer; height: 10px; }
+        #control-panel button { width: 100%; padding: 12px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; margin-top: 15px; transition: background-color 0.2s ease; }
+        #control-panel button:hover { background-color: #0056b3; }
+        #control-panel button:active { background-color: #004085; }
+        #control-panel button.pending-changes { background-color: #ffc107 !important; color: #333; }
+        #control-panel button.pending-changes:hover { background-color: #e0a800 !important; }
+        #control-panel input[type=range]::-webkit-slider-thumb { height: 24px; width: 24px; appearance: none; background: #007bff; border-radius: 50%; cursor: pointer;}
+        #control-panel input[type=range]::-moz-range-thumb { height: 24px; width: 24px; background: #007bff; border-radius: 50%; cursor: pointer; border: none;}
+
+        .hidden {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none;
+        }
+
+        body.controls-hidden #control-panel {
+             margin-right: calc(-1 * var(--control-panel-width));
+        }
+
+        body.controls-hidden #description-area {
+             right: var(--base-padding);
+        }
+
+    </style>
+</head>
+<body>
+    <button id="toggle-description" class="toggle-button">Hide Info</button>
+    <button id="toggle-debug" class="toggle-button">Hide Debug</button>
+    <button id="toggle-controls" class="toggle-button">Hide Controls</button>
+
+    <div id="canvas-container">
+         <!-- Canvas added by JS -->
+    </div>
+
+    <div id="description-area">
+        <h2>VibeBounce</h2>
+        <p>
+            Click on a voxel surface to set the simulation origin point. Rays will "bounce" from that point, reflecting off surfaces.
+        </p>
+        <p>
+            This simulation uses a <strong>Sparse Voxel Octree (SVO)</strong> to efficiently represent the 3D voxel world. An SVO is a tree data structure where space is recursively subdivided into eight octants (children). Empty regions of space are not subdivided further, saving memory and allowing for faster ray intersection tests compared to checking every single voxel. This makes simulating phenomena like light or sound propagation feasible in large voxel scenes.
+        </p>
+        <h4>Controls:</h4>
+        <ul>
+            <li><strong>Mouse Click:</strong> Set simulation origin on a voxel surface.</li>
+            <li><strong>Mouse Drag:</strong> Rotate the camera view.</li>
+            <li><strong>Mouse Wheel:</strong> Zoom in/out.</li>
+            <li><strong>Control Panel (Right):</strong>
+                <ul>
+                   <li><code>Grid Resolution</code>: Changes the detail level of the world (requires Regeneration).</li>
+                   <li><code>Noise Density</code>: Adjusts the complexity of the generated world (requires Regeneration).</li>
+                   <li><code>Rays per Blast</code>: Number of rays emitted each pulse.</li>
+                   <li><code>Max Bounces</code>: How many times a ray can reflect.</li>
+                   <li><code>Max Ray Distance</code>: How far a ray travels before stopping.</li>
+                   <li><code>Blast Interval</code>: Time between ray emission pulses (ms).</li>
+                   <li><code>Line Fade Time</code>: How long ray visuals last (ms).</li>
+                   <li><code>Line Max Opacity</code>: Starting visibility of new rays.</li>
+                   <li><code>Neighbor Opacity</code>: Visibility of neighbor voxels when origin is set.</li>
+                </ul>
+            </li>
+             <li><code>Apply & Regenerate World</code>: Button to apply resolution/density changes.</li>
+        </ul>
+        <p class="credits">
+            Vibecoded April 5th, 2024 by Trent Sterling & Gemini
+        </p>
+    </div>
+    <div id="debug">Debug info...</div>
+
+    <div id="control-panel">
+        <h3>Controls</h3>
+        <div>
+            <label for="ctrl-grid-resolution">Grid Resolution</label>
+            <select id="ctrl-grid-resolution">
+                <option value="16">16x16x16</option>
+                <option value="32" selected>32x32x32</option>
+                <option value="64">64x64x64</option>
+            </select>
+        </div>
+        <div>
+            <label for="ctrl-density">Noise Density <span id="val-density">1.9</span></label>
+            <input type="range" id="ctrl-density" min="0.5" max="3.0" step="0.1" value="1.9">
+        </div>
+        <div>
+            <button id="ctrl-regenerate">Apply & Regenerate World</button>
+        </div>
+        <hr style="border-color: rgba(255,255,255,0.1); margin: 30px 0;">
+        <div>
+            <label for="ctrl-rays">Rays per Blast <span id="val-rays">45</span></label>
+            <input type="range" id="ctrl-rays" min="10" max="200" step="5" value="45">
+        </div>
+        <div>
+            <label for="ctrl-bounces">Max Bounces <span id="val-bounces">8</span></label>
+            <input type="range" id="ctrl-bounces" min="1" max="20" step="1" value="8">
+        </div>
+        <div>
+            <label for="ctrl-ray-dist">Max Ray Distance <span id="val-ray-dist">60</span></label>
+            <input type="range" id="ctrl-ray-dist" min="10" max="100" step="1">
+        </div>
+        <div>
+            <label for="ctrl-blast-interval">Blast Interval (ms) <span id="val-blast-interval">750</span></label>
+            <input type="range" id="ctrl-blast-interval" min="100" max="2000" step="50" value="750">
+        </div>
+        <hr style="border-color: rgba(255,255,255,0.1); margin: 30px 0;">
+        <div>
+            <label for="ctrl-line-life">Line Fade Time (ms) <span id="val-line-life">1600</span></label>
+            <input type="range" id="ctrl-line-life" min="500" max="5000" step="100" value="1600">
+        </div>
+        <div>
+            <label for="ctrl-line-opacity">Line Max Opacity <span id="val-line-opacity">0.90</span></label>
+            <input type="range" id="ctrl-line-opacity" min="0.05" max="1.0" step="0.05" value="0.9">
+        </div>
+         <div>
+            <label for="ctrl-neighbor-opacity">Neighbor Opacity <span id="val-neighbor-opacity">0.75</span></label>
+            <input type="range" id="ctrl-neighbor-opacity" min="0" max="1" step="0.05" value="0.75">
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const WORLD_SIZE = 20;
+        const CHUNK_SIZE_VISUAL = 8;
+        const NEIGHBOR_HIGHLIGHT_COLOR = 0xffcc00;
+        const DRAW_SVO_GIZMOS = false;
+        const SVO_GIZMO_DRAW_DEPTH = 3;
+        const DRAG_THRESHOLD = 5;
+        const PANEL_TRANSITION_DELAY = 350;
+
+        const params = {
+            GRID_RESOLUTION: 32, MAX_SVO_DEPTH: 5, RANDOM_DENSITY_FACTOR: 1.9,
+            RAYS_PER_CAST: 45, MAX_BOUNCES: 8, MAX_RAY_DISTANCE: WORLD_SIZE * 3,
+            BLAST_INTERVAL: 750, LINE_LIFE_DURATION: 1600,
+            LINE_MAX_OPACITY: 0.9,
+            NEIGHBOR_VIS_OPACITY: 0.75,
+            regenerateWorld: () => regenerateWorld()
+        };
+        params.MAX_SVO_DEPTH = Math.max(1, Math.log2(params.GRID_RESOLUTION));
+
+        let scene, camera, renderer, controls, raycaster;
+        let svoRoot = null;
+        let voxelInstancedMesh = null;
+        let neighborInstancedMesh = null;
+        let neighborMaterial = null;
+        let voxelGeometry = null;
+        let debugOutput = "";
+        let simulationLines = [];
+        let debugOriginMarker = null;
+        let simulationOrigin = null;
+        let lastBlastTime = 0;
+        let voxelGridData = null;
+        let gridOrigin = new THREE.Vector3();
+        let voxelSize = new THREE.Vector3();
+        let worldBounds = new THREE.Box3();
+        let regenerationScheduled = false;
+        let btnRegenerate;
+        let isDragging = false;
+        const mouseDownPos = new THREE.Vector2();
+
+        let descriptionArea, debugArea, controlPanel, canvasContainer;
+        let toggleDescBtn, toggleDebugBtn, toggleControlsBtn;
+        let resizeTimeout;
+
+        function init() {
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0x111118); scene.fog = new THREE.Fog(0x111118, WORLD_SIZE * 1.0, WORLD_SIZE * 3.0);
+            camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+            camera.position.set(WORLD_SIZE * 0.6, WORLD_SIZE * 0.8, WORLD_SIZE * 1.0);
+
+            canvasContainer = document.getElementById('canvas-container');
+            renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(window.devicePixelRatio);
+            canvasContainer.appendChild(renderer.domElement);
+
+            descriptionArea = document.getElementById('description-area');
+            debugArea = document.getElementById('debug');
+            controlPanel = document.getElementById('control-panel');
+            toggleDescBtn = document.getElementById('toggle-description');
+            toggleDebugBtn = document.getElementById('toggle-debug');
+            toggleControlsBtn = document.getElementById('toggle-controls');
+
+            adjustRendererSize();
+            controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.1; controls.target.set(WORLD_SIZE * -0.1, WORLD_SIZE * 0.2, 0);
+            scene.add(new THREE.AmbientLight(0xcccccc, 0.5)); const dirLight = new THREE.DirectionalLight(0xffffff, 0.9); dirLight.position.set(WORLD_SIZE * 0.5, WORLD_SIZE, WORLD_SIZE * 0.6); scene.add(dirLight);
+            raycaster = new THREE.Raycaster();
+            const markerGeo = new THREE.IcosahedronGeometry(0.2, 1); const markerMat = new THREE.MeshBasicMaterial({color: 0x00ff88, wireframe: true}); debugOriginMarker = new THREE.Mesh(markerGeo, markerMat); debugOriginMarker.visible = false; scene.add(debugOriginMarker);
+            voxelGeometry = new THREE.BoxGeometry(1, 1, 1);
+            neighborMaterial = new THREE.MeshStandardMaterial({ color: NEIGHBOR_HIGHLIGHT_COLOR, emissive: NEIGHBOR_HIGHLIGHT_COLOR, emissiveIntensity: 0.6, transparent: true, opacity: params.NEIGHBOR_VIS_OPACITY, depthWrite: false, roughness: 0.7, metalness: 0.1 });
+
+            setupControlPanel();
+            setupToggleButtons();
+            regenerateWorld(true);
+
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('mousedown', onCanvasMouseDown);
+            renderer.domElement.addEventListener('mousemove', onCanvasMouseMove);
+            renderer.domElement.addEventListener('click', onMouseClick);
+
+            logDebug("Initialization complete. Click voxel surface to start simulation.");
+            lastBlastTime = -params.BLAST_INTERVAL;
+            controls.update();
+            animate();
+        }
+
+        function setupControlPanel() {
+            const ctrlResolution = document.getElementById('ctrl-grid-resolution'); const ctrlDensity = document.getElementById('ctrl-density'); const valDensity = document.getElementById('val-density'); btnRegenerate = document.getElementById('ctrl-regenerate'); const ctrlRays = document.getElementById('ctrl-rays'); const valRays = document.getElementById('val-rays'); const ctrlBounces = document.getElementById('ctrl-bounces'); const valBounces = document.getElementById('val-bounces'); const ctrlRayDist = document.getElementById('ctrl-ray-dist'); const valRayDist = document.getElementById('val-ray-dist'); const ctrlBlastInterval = document.getElementById('ctrl-blast-interval'); const valBlastInterval = document.getElementById('val-blast-interval'); const ctrlLineLife = document.getElementById('ctrl-line-life'); const valLineLife = document.getElementById('val-line-life');
+            const ctrlLineOpacity = document.getElementById('ctrl-line-opacity'); const valLineOpacity = document.getElementById('val-line-opacity');
+            const ctrlNeighborOpacity = document.getElementById('ctrl-neighbor-opacity'); const valNeighborOpacity = document.getElementById('val-neighbor-opacity');
+
+            ctrlResolution.value = params.GRID_RESOLUTION; ctrlDensity.value = params.RANDOM_DENSITY_FACTOR; valDensity.textContent = params.RANDOM_DENSITY_FACTOR.toFixed(1); ctrlRays.value = params.RAYS_PER_CAST; valRays.textContent = params.RAYS_PER_CAST; ctrlBounces.value = params.MAX_BOUNCES; valBounces.textContent = params.MAX_BOUNCES; const rayDistMin = WORLD_SIZE * 0.5; const rayDistMax = WORLD_SIZE * 5; ctrlRayDist.min = rayDistMin; ctrlRayDist.max = rayDistMax; ctrlRayDist.step = WORLD_SIZE * 0.1; params.MAX_RAY_DISTANCE = Math.max(rayDistMin, Math.min(rayDistMax, params.MAX_RAY_DISTANCE)); ctrlRayDist.value = params.MAX_RAY_DISTANCE; valRayDist.textContent = params.MAX_RAY_DISTANCE.toFixed(0); ctrlBlastInterval.value = params.BLAST_INTERVAL; valBlastInterval.textContent = params.BLAST_INTERVAL; ctrlLineLife.value = params.LINE_LIFE_DURATION; valLineLife.textContent = params.LINE_LIFE_DURATION;
+            ctrlLineOpacity.value = params.LINE_MAX_OPACITY; valLineOpacity.textContent = params.LINE_MAX_OPACITY.toFixed(2);
+            ctrlNeighborOpacity.value = params.NEIGHBOR_VIS_OPACITY; valNeighborOpacity.textContent = params.NEIGHBOR_VIS_OPACITY.toFixed(2);
+
+            ctrlResolution.addEventListener('change', (e) => { params.GRID_RESOLUTION = parseInt(e.target.value); params.MAX_SVO_DEPTH = Math.max(1, Math.log2(params.GRID_RESOLUTION)); scheduleRegeneration(); }); ctrlDensity.addEventListener('input', (e) => { params.RANDOM_DENSITY_FACTOR = parseFloat(e.target.value); valDensity.textContent = params.RANDOM_DENSITY_FACTOR.toFixed(1); scheduleRegeneration(); }); btnRegenerate.addEventListener('click', () => { regenerateWorld(); }); ctrlRays.addEventListener('input', (e) => { params.RAYS_PER_CAST = parseInt(e.target.value); valRays.textContent = params.RAYS_PER_CAST; }); ctrlBounces.addEventListener('input', (e) => { params.MAX_BOUNCES = parseInt(e.target.value); valBounces.textContent = params.MAX_BOUNCES; }); ctrlRayDist.addEventListener('input', (e) => { params.MAX_RAY_DISTANCE = parseFloat(e.target.value); valRayDist.textContent = params.MAX_RAY_DISTANCE.toFixed(0); }); ctrlBlastInterval.addEventListener('input', (e) => { params.BLAST_INTERVAL = parseInt(e.target.value); valBlastInterval.textContent = params.BLAST_INTERVAL; }); ctrlLineLife.addEventListener('input', (e) => { params.LINE_LIFE_DURATION = parseInt(e.target.value); valLineLife.textContent = params.LINE_LIFE_DURATION; });
+            ctrlLineOpacity.addEventListener('input', (e) => { params.LINE_MAX_OPACITY = parseFloat(e.target.value); valLineOpacity.textContent = params.LINE_MAX_OPACITY.toFixed(2); });
+            ctrlNeighborOpacity.addEventListener('input', (e) => { params.NEIGHBOR_VIS_OPACITY = parseFloat(e.target.value); valNeighborOpacity.textContent = params.NEIGHBOR_VIS_OPACITY.toFixed(2); if (neighborMaterial) { neighborMaterial.opacity = params.NEIGHBOR_VIS_OPACITY; } });
+        }
+
+        function setupToggleButtons() {
+            toggleDescBtn.addEventListener('click', () => {
+                const isHidden = descriptionArea.classList.toggle('hidden');
+                toggleDescBtn.textContent = isHidden ? 'Show Info' : 'Hide Info';
+            });
+            toggleDebugBtn.addEventListener('click', () => {
+                 const isHidden = debugArea.classList.toggle('hidden');
+                 toggleDebugBtn.textContent = isHidden ? 'Show Debug' : 'Hide Debug';
+            });
+            toggleControlsBtn.addEventListener('click', () => {
+                const isHidden = document.body.classList.toggle('controls-hidden');
+                toggleControlsBtn.textContent = isHidden ? 'Show Controls' : 'Hide Controls';
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(adjustRendererSize, PANEL_TRANSITION_DELAY);
+            });
+        }
+
+        function scheduleRegeneration() { if (!regenerationScheduled) { regenerationScheduled = true; logDebug("World parameters changed. Click 'Apply & Regenerate' to update."); if(btnRegenerate) btnRegenerate.classList.add('pending-changes'); } }
+
+        function regenerateWorld(initialCall = false) {
+            if (!initialCall) logDebug("Regenerating World...");
+            const startTime = performance.now();
+            simulationOrigin = null;
+            if(debugOriginMarker) debugOriginMarker.visible = false;
+            clearSimulationVisuals(true);
+            svoRoot = null;
+            voxelGridData = null;
+            if (voxelInstancedMesh) { scene.remove(voxelInstancedMesh); if (voxelInstancedMesh.material) voxelInstancedMesh.material.dispose(); voxelInstancedMesh.dispose(); voxelInstancedMesh = null; }
+            params.MAX_SVO_DEPTH = Math.max(1, Math.log2(params.GRID_RESOLUTION));
+            if (!initialCall) logDebug("Generating new voxel grid data...");
+            generateVoxelGrid();
+            if (!initialCall) logDebug("Building new Sparse Voxel Octree (SVO)...");
+            buildSVO();
+            if (!initialCall) logDebug("Creating new voxel instanced mesh...");
+            createVoxelMeshFromSVO();
+            lastBlastTime = -params.BLAST_INTERVAL;
+            const ctrlRayDist = document.getElementById('ctrl-ray-dist');
+            const valRayDist = document.getElementById('val-ray-dist');
+            if (ctrlRayDist) { const rayDistMin = WORLD_SIZE * 0.5; const rayDistMax = WORLD_SIZE * 5; ctrlRayDist.min = rayDistMin; ctrlRayDist.max = rayDistMax; ctrlRayDist.step = WORLD_SIZE * 0.1; params.MAX_RAY_DISTANCE = Math.max(rayDistMin, Math.min(rayDistMax, params.MAX_RAY_DISTANCE)); ctrlRayDist.value = params.MAX_RAY_DISTANCE; valRayDist.textContent = params.MAX_RAY_DISTANCE.toFixed(0); }
+            const duration = performance.now() - startTime;
+            if (!initialCall) logDebug(`World Regeneration Complete: ${duration.toFixed(1)} ms`);
+            regenerationScheduled = false;
+            if(btnRegenerate) btnRegenerate.classList.remove('pending-changes');
+        }
+
+        function logDebug(message) { console.log(message); const timestamp = new Date().toLocaleTimeString(); debugOutput = `[${timestamp}] ${message}\n` + debugOutput; const lines = debugOutput.split('\n'); if (lines.length > 20) { debugOutput = lines.slice(0, 20).join('\n'); } if (debugArea) { debugArea.innerText = debugOutput; } }
+
+        function generateVoxelGrid() { const startTime = performance.now(); voxelGridData = []; const halfWorldSize = WORLD_SIZE / 2; worldBounds = new THREE.Box3( new THREE.Vector3(-halfWorldSize, 0, -halfWorldSize), new THREE.Vector3(halfWorldSize, WORLD_SIZE, halfWorldSize) ); gridOrigin.copy(worldBounds.min); const boundsSize = worldBounds.getSize(new THREE.Vector3()); voxelSize.set( boundsSize.x / params.GRID_RESOLUTION, boundsSize.y / params.GRID_RESOLUTION, boundsSize.z / params.GRID_RESOLUTION ); const res = params.GRID_RESOLUTION; const rooms = [ {minX:Math.floor(res*0.25),maxX:Math.floor(res*0.75),minY:1,maxY:Math.floor(res*0.6),minZ:Math.floor(res*0.25),maxZ:Math.floor(res*0.75)}, {minX:Math.floor(res*0.375),maxX:Math.floor(res*0.625),minY:1,maxY:Math.floor(res*0.3),minZ:Math.floor(res*0.1),maxZ:Math.floor(res*0.9)}, {minX:Math.floor(res*0.1),maxX:Math.floor(res*0.9),minY:1,maxY:Math.floor(res*0.3),minZ:Math.floor(res*0.375),maxZ:Math.floor(res*0.625)}, {minX:1,maxX:Math.floor(res*0.2),minY:1,maxY:Math.floor(res*0.4),minZ:1,maxZ:Math.floor(res*0.2)}, {minX:Math.floor(res*0.8),maxX:res-1,minY:1,maxY:res-4,minZ:Math.floor(res*0.8),maxZ:res-1}, ]; const noiseScale = 7.0 / res; for (let x = 0; x < res; x++) { voxelGridData[x] = []; for (let y = 0; y < res; y++) { voxelGridData[x][y] = []; for (let z = 0; z < res; z++) { const worldY = gridOrigin.y + (y + 0.5) * voxelSize.y; let isOccupied = false; if (y < 1) { isOccupied = true; } if (!isOccupied && worldY < WORLD_SIZE * 0.9) { const nx = x * noiseScale; const ny = y * noiseScale; const nz = z * noiseScale; const noiseValue = 0.5 + 0.5 * ( Math.sin(nx * 1.1 + y * 0.3) * Math.cos(ny * 0.6 + z * 0.4) + Math.cos(nz * 0.9 + x * 0.2) ); if (Math.random() * params.RANDOM_DENSITY_FACTOR < noiseValue) { isOccupied = true; } } if (x < 1 || x >= res - 1 || z < 1 || z >= res - 1) { if (y < res * 0.8) { isOccupied = true; } } if (isOccupied && y > 0) { let isInRoom = false; for (const room of rooms) { if (x >= room.minX && x < room.maxX && y >= room.minY && y < room.maxY && z >= room.minZ && z < room.maxZ) { isInRoom = true; break; } } if (isInRoom) { isOccupied = false; } } voxelGridData[x][y][z] = isOccupied; } } } const duration = performance.now() - startTime; const voxelCount = countOccupiedVoxels(); logDebug(`Grid generated: ${duration.toFixed(1)}ms. ${voxelCount} occupied voxels.`); }
+
+        function countOccupiedVoxels() { if (!voxelGridData) return 0; let count = 0; const res = params.GRID_RESOLUTION; for (let x = 0; x < res; x++) { for (let y = 0; y < res; y++) { for (let z = 0; z < res; z++) { if (voxelGridData[x]?.[y]?.[z]) { count++; } } } } return count; }
+        function isRegionOccupied(gridMinCoords, numVoxelsRegion) { if (!voxelGridData) return false; const res = params.GRID_RESOLUTION; const endX = Math.min(gridMinCoords.x + numVoxelsRegion.x, res); const endY = Math.min(gridMinCoords.y + numVoxelsRegion.y, res); const endZ = Math.min(gridMinCoords.z + numVoxelsRegion.z, res); for (let x = Math.max(0, gridMinCoords.x); x < endX; x++) { for (let y = Math.max(0, gridMinCoords.y); y < endY; y++) { for (let z = Math.max(0, gridMinCoords.z); z < endZ; z++) { if (voxelGridData[x]?.[y]?.[z]) { return true; } } } } return false; }
+        function worldToGridIndices(worldPosition) { const clampedBounds = worldBounds.clone().expandByScalar(voxelSize.x * 0.01); if (!clampedBounds.containsPoint(worldPosition)) return null; const relativePos = worldPosition.clone().sub(gridOrigin); const indexX = Math.floor(relativePos.x / voxelSize.x); const indexY = Math.floor(relativePos.y / voxelSize.y); const indexZ = Math.floor(relativePos.z / voxelSize.z); const res = params.GRID_RESOLUTION; const x = Math.max(0, Math.min(res - 1, indexX)); const y = Math.max(0, Math.min(res - 1, indexY)); const z = Math.max(0, Math.min(res - 1, indexZ)); return new THREE.Vector3(x, y, z); }
+        function gridToWorldCenter(ix, iy, iz) { const center = new THREE.Vector3( gridOrigin.x + (ix + 0.5) * voxelSize.x, gridOrigin.y + (iy + 0.5) * voxelSize.y, gridOrigin.z + (iz + 0.5) * voxelSize.z ); return center; }
+
+        class SVONode { constructor(bounds, content, isLeaf = false) { this.bounds = bounds; this.isLeaf = isLeaf; this.children = null; this.isOccupied = false; if (isLeaf) { this.isOccupied = content; } else { this.children = content; if (this.children) { for (let i = 0; i < 8; i++) { if (this.children[i]?.isOccupied) { this.isOccupied = true; break; } } } } } static getChildBounds(childIndex, parentBounds) { const halfSize = parentBounds.getSize(new THREE.Vector3()).multiplyScalar(0.5); const min = parentBounds.min.clone(); if ((childIndex & 1) !== 0) min.x += halfSize.x; if ((childIndex & 2) !== 0) min.y += halfSize.y; if ((childIndex & 4) !== 0) min.z += halfSize.z; const max = min.clone().add(halfSize); return new THREE.Box3(min, max); } }
+        function buildSVO() { const startTime = performance.now(); svoRoot = buildNodeRecursive( worldBounds, new THREE.Vector3(0, 0, 0), new THREE.Vector3(params.GRID_RESOLUTION, params.GRID_RESOLUTION, params.GRID_RESOLUTION), 0 ); const duration = performance.now() - startTime; if (svoRoot) { logDebug(`SVO Built: ${duration.toFixed(1)}ms. Root Occupied: ${svoRoot.isOccupied}`); } else { logDebug(`SVO Build Failed or World Empty: ${duration.toFixed(1)}ms`); } if (DRAW_SVO_GIZMOS) { drawSVOGizmos(svoRoot, SVO_GIZMO_DRAW_DEPTH); } }
+        function buildNodeRecursive(bounds, gridMinCoords, numVoxelsRegion, currentDepth) { if (currentDepth >= params.MAX_SVO_DEPTH || numVoxelsRegion.x < 1 || numVoxelsRegion.y < 1 || numVoxelsRegion.z < 1) { const occupied = isRegionOccupied(gridMinCoords, new THREE.Vector3(1,1,1)); return occupied ? new SVONode(bounds, true, true) : null; } const containsOccupied = isRegionOccupied(gridMinCoords, numVoxelsRegion); if (!containsOccupied) { return null; } const children = new Array(8).fill(null); let hasNonEmptyChild = false; const childNumVoxels = numVoxelsRegion.clone().multiplyScalar(0.5).floor(); if (childNumVoxels.x < 1 || childNumVoxels.y < 1 || childNumVoxels.z < 1) { return new SVONode(bounds, containsOccupied, true); } for (let i = 0; i < 8; i++) { const childBounds = SVONode.getChildBounds(i, bounds); const childGridMinCoords = gridMinCoords.clone(); if ((i & 1) !== 0) childGridMinCoords.x += childNumVoxels.x; if ((i & 2) !== 0) childGridMinCoords.y += childNumVoxels.y; if ((i & 4) !== 0) childGridMinCoords.z += childNumVoxels.z; children[i] = buildNodeRecursive(childBounds, childGridMinCoords, childNumVoxels, currentDepth + 1); if (children[i]) { hasNonEmptyChild = true; } } if (!hasNonEmptyChild) { return null; } return new SVONode(bounds, children, false); }
+        function drawSVOGizmos(root, maxDepth) { if (!root) return; const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xff8800, 0x8800ff]; drawNodeGizmosRecursive(root, 0, maxDepth, colors); logDebug(`Drew SVO Gizmos up to depth ${maxDepth}`); } function drawNodeGizmosRecursive(node, currentDepth, maxDepth, colors) { if (!node || currentDepth > maxDepth) return; const helper = new THREE.Box3Helper(node.bounds, colors[currentDepth % colors.length]); scene.add(helper); if (!node.isLeaf && node.children) { for (let i = 0; i < 8; i++) { drawNodeGizmosRecursive(node.children[i], currentDepth + 1, maxDepth, colors); } } }
+
+        function createVoxelMeshFromSVO() { const startTime = performance.now(); const occupiedLeafData = []; findOccupiedLeafData(svoRoot, occupiedLeafData); if (occupiedLeafData.length === 0) { logDebug("No occupied leaf voxels found in SVO to create mesh."); return; } if (voxelInstancedMesh) { scene.remove(voxelInstancedMesh); if(voxelInstancedMesh.material) voxelInstancedMesh.material.dispose(); voxelInstancedMesh.dispose(); voxelInstancedMesh = null; } const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.05 }); voxelInstancedMesh = new THREE.InstancedMesh( voxelGeometry, material, occupiedLeafData.length ); const matrix = new THREE.Matrix4(); const scaleMatrix = new THREE.Matrix4().makeScale(voxelSize.x, voxelSize.y, voxelSize.z); const positionMatrix = new THREE.Matrix4(); const color = new THREE.Color(); const tempPos = new THREE.Vector3(); for (let i = 0; i < occupiedLeafData.length; i++) { const data = occupiedLeafData[i]; const center = data.center; positionMatrix.setPosition(center); matrix.multiplyMatrices(positionMatrix, scaleMatrix); voxelInstancedMesh.setMatrixAt(i, matrix); tempPos.copy(center).sub(gridOrigin); const chunkX = Math.floor(tempPos.x / (voxelSize.x * CHUNK_SIZE_VISUAL)); const chunkY = Math.floor(tempPos.y / (voxelSize.y * CHUNK_SIZE_VISUAL)); const chunkZ = Math.floor(tempPos.z / (voxelSize.z * CHUNK_SIZE_VISUAL)); const chunkHash = (chunkX * 31 + chunkY * 17 + chunkZ * 13) % 100; const heightNormalized = THREE.MathUtils.inverseLerp(worldBounds.min.y, worldBounds.max.y, center.y); const baseHue = 0.1 + heightNormalized * 0.15; const baseSat = 0.5 + heightNormalized * 0.1; const baseLight = 0.45 + heightNormalized * 0.2; const satOffset = (chunkHash / 100.0 - 0.5) * 0.15; const lightOffset = (chunkHash / 100.0 - 0.5) * 0.08; color.setHSL( baseHue, THREE.MathUtils.clamp(baseSat + satOffset, 0.3, 0.8), THREE.MathUtils.clamp(baseLight + lightOffset, 0.3, 0.7) ); voxelInstancedMesh.setColorAt(i, color); } voxelInstancedMesh.instanceMatrix.needsUpdate = true; if (voxelInstancedMesh.instanceColor) { voxelInstancedMesh.instanceColor.needsUpdate = true; } scene.add(voxelInstancedMesh); const duration = performance.now() - startTime; logDebug(`Voxel Mesh Created: ${occupiedLeafData.length} instances in ${duration.toFixed(1)} ms`); }
+        function findOccupiedLeafData(node, occupiedArray) { if (!node) return; if (node.isLeaf) { if (node.isOccupied) { occupiedArray.push({ center: node.bounds.getCenter(new THREE.Vector3()), node: node }); } } else if (node.children) { for (let i = 0; i < 8; i++) { findOccupiedLeafData(node.children[i], occupiedArray); } } }
+
+        function raycastSVO(ray, maxDist = Infinity) { const result = { hit: false, distance: maxDist, point: null, node: null, normal: null }; if (!svoRoot || !svoRoot.isOccupied) return result; const intersectionPoint = new THREE.Vector3(); if (!ray.intersectBox(svoRoot.bounds, intersectionPoint)) { return result; } const t0 = ray.origin.distanceTo(intersectionPoint); if (t0 >= maxDist) { return result; } const stack = []; stack.push({ node: svoRoot, tMin: t0 }); let bestHitDistance = maxDist; while (stack.length > 0) { const { node, tMin } = stack.pop(); if (tMin >= bestHitDistance) { continue; } if (node.isLeaf) { if (node.isOccupied) { if (tMin < bestHitDistance) { bestHitDistance = tMin; result.hit = true; result.node = node; } } continue; } if (node.children) { const childIntersections = []; for (let i = 0; i < 8; i++) { const child = node.children[i]; if (!child || !child.isOccupied) continue; if (ray.intersectBox(child.bounds, intersectionPoint)) { const childTMin = ray.origin.distanceTo(intersectionPoint); if (childTMin < bestHitDistance) { childIntersections.push({ node: child, tMin: childTMin }); } } } childIntersections.sort((a, b) => b.tMin - a.tMin); for (const childData of childIntersections) { stack.push(childData); } } } if (result.hit) { result.distance = bestHitDistance; result.point = ray.origin.clone().addScaledVector(ray.direction, bestHitDistance); if (result.node && result.node.bounds) { result.normal = getApproximateNormal(result.point, result.node.bounds); } else { result.normal = new THREE.Vector3(0, 1, 0); } } return result; }
+        function getApproximateNormal(hitPoint, bounds) { const center = bounds.getCenter(new THREE.Vector3()); const halfSize = bounds.getSize(new THREE.Vector3()).multiplyScalar(0.5); const relativeHit = hitPoint.clone().sub(center); let dx = Math.abs(relativeHit.x), dy = Math.abs(relativeHit.y), dz = Math.abs(relativeHit.z); const epsilon = 1e-6; if (halfSize.x > epsilon) dx /= halfSize.x; else dx = Infinity; if (halfSize.y > epsilon) dy /= halfSize.y; else dy = Infinity; if (halfSize.z > epsilon) dz /= halfSize.z; else dz = Infinity; if (dx > dy && dx > dz) { return new THREE.Vector3(Math.sign(relativeHit.x), 0, 0); } else if (dy > dz) { return new THREE.Vector3(0, Math.sign(relativeHit.y), 0); } else if (dz > 0 && dz < Infinity) { return new THREE.Vector3(0, 0, Math.sign(relativeHit.z)); } else { return relativeHit.normalize(); } }
+
+        function simulateSoundPropagation(startPos, initialDir, maxBounces, maxDist) { const pathPoints = [startPos.clone()]; let currentPos = startPos.clone(); let currentDir = initialDir.clone().normalize(); let distanceTraveled = 0; const hue = (Math.atan2(initialDir.z, initialDir.x) / (Math.PI * 2) + 0.5) % 1.0; const lightness = 0.6 + Math.abs(initialDir.y) * 0.15; const pathColor = new THREE.Color().setHSL(hue, 0.9, lightness); for (let bounce = 0; bounce < maxBounces; bounce++) { const remainingDistance = maxDist - distanceTraveled; if (remainingDistance <= 0.01) break; const ray = new THREE.Ray(currentPos, currentDir); const hitResult = raycastSVO(ray, remainingDistance); if (hitResult.hit && hitResult.point && hitResult.normal) { if (hitResult.distance < 0.001 && bounce > 0) { pathPoints.push(currentPos.clone().addScaledVector(currentDir, 0.01)); distanceTraveled = maxDist; break; } distanceTraveled += hitResult.distance; pathPoints.push(hitResult.point.clone()); currentDir.reflect(hitResult.normal).normalize(); currentPos = hitResult.point.clone().addScaledVector(currentDir, 0.005); if (distanceTraveled >= maxDist) break; } else { pathPoints.push(currentPos.clone().addScaledVector(currentDir, remainingDistance)); distanceTraveled = maxDist; break; } } visualizeRayPath(pathPoints, pathColor); }
+
+        function visualizeRayPath(points, color) {
+            if (points.length < 2) return;
+             const uniquePoints = [points[0]];
+             for (let i = 1; i < points.length; ++i) { if (points[i].distanceToSquared(points[i - 1]) > 1e-5) { uniquePoints.push(points[i]); } }
+             if (uniquePoints.length < 2) return;
+            const geometry = new THREE.BufferGeometry().setFromPoints(uniquePoints);
+            const material = new THREE.LineBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: params.LINE_MAX_OPACITY,
+                depthTest: false
+            });
+            const line = new THREE.Line(geometry, material);
+            line.renderOrder = 999; scene.add(line);
+            simulationLines.push({ line: line, creationTime: performance.now() });
+        }
+
+        function clearSimulationVisuals(forceClearAll = false) {
+            const currentTime = performance.now();
+            const linesToKeep = [];
+            for (let i = simulationLines.length - 1; i >= 0; i--) {
+                const simLine = simulationLines[i];
+                const age = currentTime - simLine.creationTime;
+                if (forceClearAll || age >= params.LINE_LIFE_DURATION) {
+                    if (simLine.line.parent) simLine.line.parent.remove(simLine.line);
+                    simLine.line.geometry.dispose(); simLine.line.material.dispose();
+                } else {
+                    const fadeRatio = age / params.LINE_LIFE_DURATION;
+                    simLine.line.material.opacity = Math.max(0, params.LINE_MAX_OPACITY * (1.0 - fadeRatio * fadeRatio));
+                    linesToKeep.push(simLine);
+                }
+            }
+            simulationLines = linesToKeep.reverse();
+            if (forceClearAll) {
+                if (debugOriginMarker) debugOriginMarker.visible = false;
+                clearNeighborHighlights();
+            }
+        }
+        function clearNeighborHighlights() { if (neighborInstancedMesh) { scene.remove(neighborInstancedMesh); neighborInstancedMesh.dispose(); neighborInstancedMesh = null; } }
+
+        function adjustRendererSize() {
+             const containerWidth = canvasContainer.offsetWidth;
+             const containerHeight = canvasContainer.offsetHeight;
+
+             if (containerWidth <= 0 || containerHeight <= 0) return;
+
+             camera.aspect = containerWidth / containerHeight;
+             camera.updateProjectionMatrix();
+             renderer.setSize(containerWidth, containerHeight);
+        }
+
+        function onWindowResize() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(adjustRendererSize, 50);
+        }
+
+        function onCanvasMouseDown(event) {
+            if (event.button === 0) {
+                isDragging = false;
+                mouseDownPos.set(event.clientX, event.clientY);
+
+                if (!descriptionArea.classList.contains('hidden')) {
+                     descriptionArea.classList.add('hidden');
+                     toggleDescBtn.textContent = 'Show Info';
+                 }
+            }
+        }
+        function onCanvasMouseMove(event) { if ((event.buttons & 1) && !isDragging) { const dx = event.clientX - mouseDownPos.x; const dy = event.clientY - mouseDownPos.y; const distSq = dx * dx + dy * dy; if (distSq > (DRAG_THRESHOLD * DRAG_THRESHOLD)) { isDragging = true; } } }
+
+        function onMouseClick(event){
+            if (isDragging) { return; }
+            if (!descriptionArea.classList.contains('hidden')) {
+                descriptionArea.classList.add('hidden');
+                toggleDescBtn.textContent = 'Show Info';
+            }
+
+            if(!svoRoot){ logDebug("SVO not ready. Cannot set origin."); return; }
+            const mouse = new THREE.Vector2(); const canvas = renderer.domElement; const rect = canvas.getBoundingClientRect();
+
+            const mouseXInCanvas = event.clientX - rect.left;
+            const mouseYInCanvas = event.clientY - rect.top;
+            mouse.x = (mouseXInCanvas / rect.width) * 2 - 1;
+            mouse.y = -(mouseYInCanvas / rect.height) * 2 + 1;
+
+             if (mouse.x < -1 || mouse.x > 1 || mouse.y < -1 || mouse.y > 1) {
+                return;
+             }
+
+            raycaster.setFromCamera(mouse, camera);
+            const clickRay = raycaster.ray;
+            const hitResult = raycastSVO(clickRay, camera.far);
+            clearSimulationVisuals(true);
+
+            if(hitResult.hit && hitResult.point && hitResult.normal){
+                const hitPoint = hitResult.point; const hitNormal = hitResult.normal;
+                simulationOrigin = hitPoint.clone().addScaledVector(hitNormal, voxelSize.x * 0.51);
+                logDebug(`Simulation origin set @ ${simulationOrigin.x.toFixed(1)}, ${simulationOrigin.y.toFixed(1)}, ${simulationOrigin.z.toFixed(1)} (Offset from surface ${hitPoint.x.toFixed(1)},${hitPoint.y.toFixed(1)},${hitPoint.z.toFixed(1)})`);
+                debugOriginMarker.position.copy(simulationOrigin); debugOriginMarker.visible = true;
+                showNeighborHighlights(hitPoint);
+                lastBlastTime = -params.BLAST_INTERVAL * 2;
+            } else {
+                logDebug("Click missed SVO geometry.");
+                simulationOrigin = null; debugOriginMarker.visible = false;
+                clearNeighborHighlights();
+            }
+        }
+
+        function showNeighborHighlights(centerWorldPos) { clearNeighborHighlights(); const centerIndices = worldToGridIndices(centerWorldPos); if (!centerIndices) { logDebug("Could not determine grid index for hit point. Cannot show neighbors."); return; } const cx = Math.round(centerIndices.x); const cy = Math.round(centerIndices.y); const cz = Math.round(centerIndices.z); const neighborPositions = []; const res = params.GRID_RESOLUTION; for (let dx = -1; dx <= 1; dx++) { for (let dy = -1; dy <= 1; dy++) { for (let dz = -1; dz <= 1; dz++) { if (dx === 0 && dy === 0 && dz === 0) continue; const nx = cx + dx; const ny = cy + dy; const nz = cz + dz; if (nx < 0 || nx >= res || ny < 0 || ny >= res || nz < 0 || nz >= res) continue; if (voxelGridData[nx]?.[ny]?.[nz]) { neighborPositions.push(gridToWorldCenter(nx, ny, nz)); } } } } if (neighborPositions.length === 0) { return; } neighborMaterial.opacity = params.NEIGHBOR_VIS_OPACITY; neighborInstancedMesh = new THREE.InstancedMesh( voxelGeometry, neighborMaterial, neighborPositions.length ); const matrix = new THREE.Matrix4(); const scaleMatrix = new THREE.Matrix4().makeScale(voxelSize.x, voxelSize.y, voxelSize.z); const posMatrix = new THREE.Matrix4(); for (let i = 0; i < neighborPositions.length; i++) { posMatrix.setPosition(neighborPositions[i]); matrix.multiplyMatrices(posMatrix, scaleMatrix); neighborInstancedMesh.setMatrixAt(i, matrix); } neighborInstancedMesh.instanceMatrix.needsUpdate = true; neighborInstancedMesh.renderOrder = 1; scene.add(neighborInstancedMesh); }
+
+        function animate() { requestAnimationFrame(animate); const now = performance.now(); if (simulationOrigin && svoRoot) { if (now - lastBlastTime > params.BLAST_INTERVAL) { for (let i = 0; i < params.RAYS_PER_CAST; i++) { const randomDir = new THREE.Vector3( Math.random() - 0.5, Math.random() * 0.8 - 0.4, Math.random() - 0.5 ).normalize(); if (randomDir.lengthSq() < 0.01) randomDir.set(0, -1, 0); simulateSoundPropagation( simulationOrigin, randomDir, params.MAX_BOUNCES, params.MAX_RAY_DISTANCE ); } lastBlastTime = now; } const timeSinceBlast = now - lastBlastTime; const pulsePhase = (timeSinceBlast / params.BLAST_INTERVAL) * Math.PI * 2; const pulseScale = 1.0 + 0.4 * Math.sin(pulsePhase) * Math.max(0, 1 - (timeSinceBlast / params.BLAST_INTERVAL)); if (debugOriginMarker?.visible) { debugOriginMarker.scale.set(pulseScale, pulseScale, pulseScale); } } clearSimulationVisuals(false); controls.update(); renderer.render(scene, camera); }
+
+        init();
+
+    </script>
+</body>
+</html>
